@@ -16,7 +16,7 @@ def get_link():
         
         # הרצת yt-dlp עם דגל -g לקבלת הלינק הישיר
         # הוספנו stderr=subprocess.STDOUT כדי לתפוס שגיאות פנימיות של הכלי
-        cmd = ["yt-dlp", "--cookies", "cookies.txt", "-g", video_url]
+        cmd = ["yt-dlp", "--cookies", "cookies.txt", "-f", "best", "-g", video_url]
         
         # הרצת הפקודה
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8').strip()
