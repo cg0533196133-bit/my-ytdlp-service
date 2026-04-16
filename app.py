@@ -1,60 +1,32 @@
-from flask import Flask, request
-import subprocess
-import os
+from flask import Flask, request, jsonify
+import yt_dlp
 
 app = Flask(__name__)
 
-@app.route('/get_link', methods=['POST'])
-def get_link():
+@app.route("/get", methods=["GET"])
+def get_video():
+    url = request.args.get("url")
+
+    if not url:
+        return jsonify({"error": "missing url"}), 400
+
+    ydl_opts = {
+        "quiet": True,
+        "format": "best",
+        "noplaylist": True
+    }
+
     try:
-        data = request.get_json()
-        if not data or 'url' not in data:
-            return "Error: Missing URL", 400
-            
-        video_url = data.get('url')
-        
-        # בניית פקודה עם הגדרות פורמט גמישות יותר
-       cmd = [
-            "yt-dlp",
-            "--no-check-certificates",
-            "--extractor-args", "youtube:player_client=web_embedded",
-            "-f", "b",
-            "-g",
-            video_url
-        ]
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
-        if os.path.exists("cookies.txt"):
-            cmd.insert(1, "--cookies")
-            cmd.insert(2, "cookies.txt")
-        
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        # וודא שה-JS Runtime מוגדר
-        env["YTDLP_JS_RUNTIME"] = "node"
-        
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=env,
-            text=True
-        )
-        stdout, stderr = process.communicate()
-
-        if process.returncode != 0:
-            # ניסיון אחרון בהחלט: בלי פורמט ספציפי בכלל
-            cmd_fallback = ["yt-dlp", "-g", video_url]
-            if os.path.exists("cookies.txt"):
-                cmd_fallback.insert(1, "--cookies")
-                cmd_fallback.insert(2, "cookies.txt")
-            
-            output_fallback = subprocess.check_output(cmd_fallback, stderr=subprocess.STDOUT).decode('utf-8').strip()
-            return output_fallback
-            
-        return stdout.strip()
+            return jsonify({
+                "title": info.get("title"),
+                "url": info.get("url")
+            })
 
     except Exception as e:
-        return f"Final Attempt Error: {str(e)}", 500
+        return jsonify({"error": str(e)})
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)
+    app.run(host="0.0.0.0", port=10000)
