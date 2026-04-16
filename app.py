@@ -13,7 +13,16 @@ def get_video():
     ydl_opts = {
         "quiet": True,
         "format": "best",
-        "noplaylist": True
+        "noplaylist": True,
+
+        # 🍪 שימוש בקוקיז מקובץ
+        "cookiefile": "cookies.txt",
+
+        # 🌐 headers כדי להיראות כמו דפדפן אמיתי
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
     }
 
     try:
