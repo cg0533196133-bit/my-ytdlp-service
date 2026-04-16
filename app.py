@@ -1,6 +1,7 @@
 from flask import Flask, request
 import subprocess
 import os
+import shutil
 
 app = Flask(__name__)
 
@@ -12,36 +13,50 @@ def get_link():
             return "Error: Missing URL", 400
             
         video_url = data.get('url')
-        cookie_path = "cookies.txt"
-
-        # פקודה שכוללת את כל המעקפים האפשריים
+        
+        # מציאת הנתיב המדויק של Node.js בשרת
+        node_path = shutil.which("node")
+        
+        # בניית פקודה עם הגדרות עקיפה מתקדמות
         cmd = [
             "yt-dlp",
             "--no-check-certificates",
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "-f", "b", 
+            "--extractor-args", "youtube:player_client=android,web", # שימוש בלקוחות שונים של יוטיוב
+            "-f", "b",
             "-g",
             video_url
         ]
-        
-        # הוספת עוגיות אם הקובץ קיים
-        if os.path.exists(cookie_path):
-            cmd.insert(1, "--cookies")
-            cmd.insert(2, cookie_path)
-        
-        # הרצה עם הגדרת שפת המערכת ל-UTF8
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        
-        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, env=env).decode('utf-8').strip()
-        return output
 
-    except subprocess.CalledProcessError as e:
-        error_details = e.output.decode('utf-8')
-        return f"YT-DLP Error: {error_details}", 500
+        # הוספת עוגיות אם קיימות
+        if os.path.exists("cookies.txt"):
+            cmd.insert(1, "--cookies")
+            cmd.insert(2, "cookies.txt")
+        
+        # הגדרת סביבת עבודה עם נתיב מפורש ל-Node
+        env = os.environ.copy()
+        if node_path:
+            env["YTDLP_JS_RUNTIME"] = "node"
+            # מוודא שהתיקייה של Node נמצאת ב-PATH
+            env["PATH"] = f"{os.path.dirname(node_path)}:{env.get('PATH', '')}"
+
+        # הרצה
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            text=True
+        )
+        stdout, stderr = process.communicate()
+
+        if process.returncode != 0:
+            return f"YT-DLP Error: {stderr}", 500
+            
+        return stdout.strip()
+
     except Exception as e:
         return f"Server Error: {str(e)}", 500
 
 if __name__ == "__main__":
-    # ב-Docker של Render חובה להקשיב על פורט 10000
     app.run(host='0.0.0.0', port=10000)
