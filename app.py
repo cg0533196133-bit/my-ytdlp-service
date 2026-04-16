@@ -14,14 +14,10 @@ def get_link():
         video_url = data.get('url')
         
         # בניית פקודה עם הגדרות פורמט גמישות יותר
-        cmd = [
+       cmd = [
             "yt-dlp",
             "--no-check-certificates",
-            "--quiet",
-            "--no-warnings",
-            # שילוב לקוחות: ננסה קודם ios ואז mweb (גרסת מובייל)
-            "--extractor-args", "youtube:player_client=ios,mweb",
-            # פורמט: נבקש את ה-best הכי בסיסי שיש (b)
+            "--extractor-args", "youtube:player_client=web_embedded",
             "-f", "b",
             "-g",
             video_url
