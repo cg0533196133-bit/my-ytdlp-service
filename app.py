@@ -17,10 +17,12 @@ def get_link():
         cookie_path = os.path.join(os.getcwd(), "cookies.txt")
         
         # בניית הפקודה עם -f b (best pre-merged)
-        cmd = [
+       cmd = [
             "yt-dlp",
             "--no-check-certificates",
-            "-f", "b",
+            "--quiet",
+            "--no-warnings",
+            "-f", "best[ext=mp4]/best", # מחפש MP4 הכי טוב, ואם אין אז פשוט הכי טוב
             "-g",
             video_url
         ]
