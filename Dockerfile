@@ -1,23 +1,23 @@
-FROM python:3.11-slim
+# שימוש בתמונה של פייתון
+FROM python:3.9-slim
 
-# התקנת כלים בסיסיים ו-Node.js בצורה ישירה
+# התקנת כלים נחוצים: Node.js (בשביל ה-JS Runtime) ו-FFmpeg
 RUN apt-get update && apt-get install -y \
     curl \
     ffmpeg \
-    nodejs \
-    npm \
+    && curl -sL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# הגדרת תיקיית עבודה
 WORKDIR /app
 
-# התקנת yt-dlp ו-Flask
+# העתקת קובץ הדרישות והתקנה
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# העתקת כל שאר הקבצים
+# העתקת שאר הקבצים (כולל cookies.txt ו-app.py)
 COPY . .
 
-# הגדרת משתנה סביבה כדי ש-yt-dlp יזהה את ה-JS Runtime
-ENV YTDLP_JS_RUNTIME=node
-
+# הרצת השרת
 CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
