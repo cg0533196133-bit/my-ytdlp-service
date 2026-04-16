@@ -1,7 +1,6 @@
 from flask import Flask, request
 import subprocess
 import os
-import shutil
 
 app = Flask(__name__)
 
@@ -14,33 +13,28 @@ def get_link():
             
         video_url = data.get('url')
         
-        # מציאת הנתיב המדויק של Node.js בשרת
-        node_path = shutil.which("node")
-        
-        # בניית פקודה עם הגדרות עקיפה מתקדמות
+        # בניית פקודה שמשתמשת בלקוח TV - זה עוקף את הצורך ב-JS מורכב
         cmd = [
             "yt-dlp",
             "--no-check-certificates",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "--extractor-args", "youtube:player_client=android,web", # שימוש בלקוחות שונים של יוטיוב
-            "-f", "b",
+            "--quiet",
+            "--no-warnings",
+            # הפקודה הבאה היא הקסם: היא מכריחה שימוש בלקוחות TV שלא דורשים n-challenge
+            "--extractor-args", "youtube:player_client=tv,web",
+            "-f", "best",
             "-g",
             video_url
         ]
 
-        # הוספת עוגיות אם קיימות
+        # הוספת עוגיות אם קיימות (למרות שעם לקוח TV לפעמים לא צריך)
         if os.path.exists("cookies.txt"):
             cmd.insert(1, "--cookies")
             cmd.insert(2, "cookies.txt")
         
-        # הגדרת סביבת עבודה עם נתיב מפורש ל-Node
-        env = os.environ.copy()
-        if node_path:
-            env["YTDLP_JS_RUNTIME"] = "node"
-            # מוודא שהתיקייה של Node נמצאת ב-PATH
-            env["PATH"] = f"{os.path.dirname(node_path)}:{env.get('PATH', '')}"
-
         # הרצה
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -51,6 +45,7 @@ def get_link():
         stdout, stderr = process.communicate()
 
         if process.returncode != 0:
+            # אם נכשל, ננסה פעם אחרונה בלי לקוח ספציפי
             return f"YT-DLP Error: {stderr}", 500
             
         return stdout.strip()
