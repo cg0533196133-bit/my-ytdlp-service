@@ -13,27 +13,28 @@ def get_link():
             
         video_url = data.get('url')
         
-        # בניית פקודה שמשתמשת בלקוח TV - זה עוקף את הצורך ב-JS מורכב
+        # בניית פקודה עם הגדרות פורמט גמישות יותר
         cmd = [
             "yt-dlp",
             "--no-check-certificates",
             "--quiet",
             "--no-warnings",
-            # הפקודה הבאה היא הקסם: היא מכריחה שימוש בלקוחות TV שלא דורשים n-challenge
-            "--extractor-args", "youtube:player_client=tv,web",
-            "-f", "best",
+            # שילוב לקוחות: ננסה קודם ios ואז mweb (גרסת מובייל)
+            "--extractor-args", "youtube:player_client=ios,mweb",
+            # פורמט: נבקש את ה-best הכי בסיסי שיש (b)
+            "-f", "b",
             "-g",
             video_url
         ]
 
-        # הוספת עוגיות אם קיימות (למרות שעם לקוח TV לפעמים לא צריך)
         if os.path.exists("cookies.txt"):
             cmd.insert(1, "--cookies")
             cmd.insert(2, "cookies.txt")
         
-        # הרצה
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
+        # וודא שה-JS Runtime מוגדר
+        env["YTDLP_JS_RUNTIME"] = "node"
         
         process = subprocess.Popen(
             cmd,
@@ -45,13 +46,19 @@ def get_link():
         stdout, stderr = process.communicate()
 
         if process.returncode != 0:
-            # אם נכשל, ננסה פעם אחרונה בלי לקוח ספציפי
-            return f"YT-DLP Error: {stderr}", 500
+            # ניסיון אחרון בהחלט: בלי פורמט ספציפי בכלל
+            cmd_fallback = ["yt-dlp", "-g", video_url]
+            if os.path.exists("cookies.txt"):
+                cmd_fallback.insert(1, "--cookies")
+                cmd_fallback.insert(2, "cookies.txt")
+            
+            output_fallback = subprocess.check_output(cmd_fallback, stderr=subprocess.STDOUT).decode('utf-8').strip()
+            return output_fallback
             
         return stdout.strip()
 
     except Exception as e:
-        return f"Server Error: {str(e)}", 500
+        return f"Final Attempt Error: {str(e)}", 500
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=10000)
