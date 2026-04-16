@@ -1,7 +1,6 @@
-# שימוש בגרסה חדישה יותר של פייתון
 FROM python:3.11-slim
 
-# התקנת כלים נחוצים
+# התקנת כלים, FFmpeg ו-Node.js
 RUN apt-get update && apt-get install -y \
     curl \
     ffmpeg \
@@ -11,11 +10,14 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# התקנת ספריות פייתון
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# העתקת כל הקבצים
+# העתקת כל הקבצים (כולל ה-cookies.txt ששלחת)
 COPY . .
 
-# פקודת ההרצה
+# הגדרה מפורשת ל-yt-dlp להשתמש ב-Node
+ENV YTDLP_JS_RUNTIME=node
+
 CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
