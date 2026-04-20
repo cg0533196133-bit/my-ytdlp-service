@@ -23,20 +23,25 @@ def get_link():
         cmd = [
             "yt-dlp",
             "--cookies", "cookies.txt",
-            "--impersonate", "chrome",           # חשוב נגד חסימה
-            "--extractor-args", "youtube:player_client=web,ios,android",
+            "--impersonate", "chrome",
+            "--extractor-args", "youtube:player_client=web,ios,android,web_embedded",
             "-f", "best",
             "-g",
+            "--no-check-certificate",
             video_url
         ]
         
-        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, timeout=30).decode('utf-8').strip()
+        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, timeout=40).decode('utf-8').strip()
         
         print(f"[{time.strftime('%H:%M:%S')}] קישור ישיר התקבל בהצלחה")
         return output
 
+    except subprocess.CalledProcessError as e:
+        error_output = e.output.decode('utf-8', errors='ignore')
+        print(f"שגיאה ב-get_link: {error_output}")
+        return f"YT-DLP Error: {error_output}", 500
     except Exception as e:
-        print(f"שגיאה ב-get_link: {str(e)}")
+        print(f"שגיאה כללית ב-get_link: {str(e)}")
         return f"Error: {str(e)}", 500
 
 
@@ -58,14 +63,15 @@ def trigger_download():
         cmd = [
             "yt-dlp",
             "--cookies", "cookies.txt",
-            "--impersonate", "chrome",                    # חשוב מאוד
-            "--extractor-args", "youtube:player_client=web,ios,android",
+            "--impersonate", "chrome",
+            "--extractor-args", "youtube:player_client=web,ios,android,web_embedded",
             "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
             "--merge-output-format", "mp4",
             "--no-progress",
             "--retries", "10",
             "--fragment-retries", "10",
-            "--concurrent-fragments", "1",                # מונע בעיות עם fragments
+            "--concurrent-fragments", "1",
+            "--no-check-certificate",
             "-o", output_path,
             video_url
         ]
