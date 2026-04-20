@@ -1,7 +1,7 @@
 # שימוש בתמונה של פייתון
 FROM python:3.9-slim
 
-# התקנת כלים נחוצים: Node.js (בשביל ה-JS Runtime) ו-FFmpeg
+# התקנת כלים נחוצים: ffmpeg, curl ו-Node.js
 RUN apt-get update && apt-get install -y \
     curl \
     ffmpeg \
@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
 
 # הגדרת תיקיית עבודה
 WORKDIR /app
+
+# יצירת תיקייה להורדות (חשוב מאוד!)
+RUN mkdir -p /app/downloads
 
 # העתקת קובץ הדרישות והתקנה
 COPY requirements.txt .
