@@ -1,37 +1,49 @@
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 import subprocess
 import os
+import uuid
 
 app = Flask(__name__)
+DOWNLOAD_FOLDER = 'downloads'
+if not os.path.exists(DOWNLOAD_FOLDER):
+    os.makedirs(DOWNLOAD_FOLDER)
 
+# שלב א: רק חילוץ הלינק הישיר
 @app.route('/get_link', methods=['POST'])
 def get_link():
     try:
-        # קבלת הנתונים מהבקשה שנשלחה מ-OnlineGDB
         data = request.get_json()
-        if not data or 'url' not in data:
-            return "Error: Missing URL in request", 400
-            
         video_url = data.get('url')
-        
-        # הרצת yt-dlp עם דגל -g לקבלת הלינק הישיר
-        # הוספנו stderr=subprocess.STDOUT כדי לתפוס שגיאות פנימיות של הכלי
-        cmd = ["yt-dlp", "--cookies", "cookies.txt", "-f", "best", "-g", video_url]
-        
-        # הרצת הפקודה
+        cmd = ["yt-dlp", "--cookies", "cookies.txt", "-g", video_url]
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8').strip()
-        
-        return output
-
-    except subprocess.CalledProcessError as e:
-        # במקרה ש-yt-dlp נכשל, נחזיר את הודעת השגיאה המקורית שלו
-        error_details = e.output.decode('utf-8')
-        return f"YT-DLP Error: {error_details}", 500
+        return {"direct_link": output}
     except Exception as e:
-        # שגיאות כלליות אחרות
-        return f"Server Error: {str(e)}", 500
+        return str(e), 500
 
-# הגדרת הפורט עבור Render
+# שלב ב: הורדה פיזית לשרת
+@app.route('/download', methods=['POST'])
+def download_file():
+    try:
+        data = request.get_json()
+        video_url = data.get('url')
+        file_id = str(uuid.uuid4())
+        output_template = os.path.join(DOWNLOAD_FOLDER, f"{file_id}.%(ext)s")
+        
+        cmd = [
+            "yt-dlp", "--cookies", "cookies.txt",
+            "-f", "best[ext=mp4]", "-o", output_template, video_url
+        ]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        
+        # מציאת הקובץ שנוצר
+        files = [f for f in os.listdir(DOWNLOAD_FOLDER) if f.startswith(file_id)]
+        return {"download_url": f"{request.host_url}files/{files[0]}"}
+    except Exception as e:
+        return str(e), 500
+
+@app.route('/files/<filename>')
+def serve_file(filename):
+    return send_from_directory(DOWNLOAD_FOLDER, filename)
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
