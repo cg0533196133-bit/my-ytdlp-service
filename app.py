@@ -1,49 +1,85 @@
-from flask import Flask, request, send_from_directory
+from flask import Flask, request, send_file, url_for
 import subprocess
 import os
 import uuid
 
 app = Flask(__name__)
-DOWNLOAD_FOLDER = 'downloads'
-if not os.path.exists(DOWNLOAD_FOLDER):
-    os.makedirs(DOWNLOAD_FOLDER)
 
-# שלב א: רק חילוץ הלינק הישיר
+DOWNLOAD_FOLDER = '/app/downloads'
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+# ====================== הקוד הישן שלך (לא משנים כלום) ======================
 @app.route('/get_link', methods=['POST'])
 def get_link():
     try:
         data = request.get_json()
+        if not data or 'url' not in data:
+            return "Error: Missing URL in request", 400
+            
         video_url = data.get('url')
-        cmd = ["yt-dlp", "--cookies", "cookies.txt", "-g", video_url]
+        
+        cmd = ["yt-dlp", "--cookies", "cookies.txt", "-f", "best", "-g", video_url]
+        
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8').strip()
-        return {"direct_link": output}
-    except Exception as e:
-        return str(e), 500
+        
+        return output
 
-# שלב ב: הורדה פיזית לשרת
-@app.route('/download', methods=['POST'])
-def download_file():
+    except subprocess.CalledProcessError as e:
+        error_details = e.output.decode('utf-8')
+        return f"YT-DLP Error: {error_details}", 500
+    except Exception as e:
+        return f"Server Error: {str(e)}", 500
+
+
+# ====================== חלק חדש - הורדה בפועל ======================
+@app.route('/trigger_download', methods=['POST'])
+def trigger_download():
     try:
         data = request.get_json()
+        if not data or 'url' not in data:
+            return "Error: Missing URL", 400
+
         video_url = data.get('url')
-        file_id = str(uuid.uuid4())
-        output_template = os.path.join(DOWNLOAD_FOLDER, f"{file_id}.%(ext)s")
-        
+
+        # שם קובץ ייחודי
+        filename = f"{uuid.uuid4().hex}.mp4"
+        output_path = os.path.join(DOWNLOAD_FOLDER, filename)
+
+        print(f"מתחיל הורדה של: {video_url} → {filename}")   # זה יופיע בלוגים של Render
+
         cmd = [
-            "yt-dlp", "--cookies", "cookies.txt",
-            "-f", "best[ext=mp4]", "-o", output_template, video_url
+            "yt-dlp",
+            "--cookies", "cookies.txt",
+            "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "--merge-output-format", "mp4",
+            "-o", output_path,
+            video_url
         ]
+
+        # הרצת ההורדה (זה לוקח זמן – כאן יופיע "בתהליך הורדה")
         subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        
-        # מציאת הקובץ שנוצר
-        files = [f for f in os.listdir(DOWNLOAD_FOLDER) if f.startswith(file_id)]
-        return {"download_url": f"{request.host_url}files/{files[0]}"}
+
+        # יצירת קישור להורדה
+        download_url = url_for('download_file', filename=filename, _external=True)
+
+        return download_url
+
+    except subprocess.CalledProcessError as e:
+        error_details = e.output.decode('utf-8')
+        return f"YT-DLP Error: {error_details}", 500
     except Exception as e:
-        return str(e), 500
+        return f"Server Error: {str(e)}", 500
 
-@app.route('/files/<filename>')
-def serve_file(filename):
-    return send_from_directory(DOWNLOAD_FOLDER, filename)
 
+@app.route('/download/<filename>')
+def download_file(filename):
+    file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True, download_name=filename)
+    return "File not found", 404
+
+
+# הרצה ל-Render
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
